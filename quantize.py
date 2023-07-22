@@ -38,8 +38,8 @@ def quantize(build_dir, quant_mode, batchsize, dataset_dir):
     # force to merge BN with CONV for better quantization accuracy
     optimize = 1
 
-    # override batchsize if in dataset mode
-    if (quant_mode == 'dataset'):
+    # override batchsize if in test mode
+    if quant_mode == 'test':
         batchsize = 1
 
     rand_in = torch.randn([batchsize, 3, 640, 640])
@@ -51,32 +51,19 @@ def quantize(build_dir, quant_mode, batchsize, dataset_dir):
                                           transforms.Resize((640, 640)),
                                           transforms.RandomHorizontalFlip(0.5)])
     test_dataset = MyDataset(dataset_dir, test_transforms)
-    print(test_dataset.__len__())
-    test_loader = torch.utils.data.DataLoader(test_dataset,
-                                              batch_size=batchsize,
-                                              shuffle=False)
 
     t_loader = torch.utils.data.DataLoader(test_dataset,
-                                           batch_size=1 if quant_mode == 'dataset' else 10,
+                                           batch_size=1 if quant_mode == 'test' else 10,
                                            shuffle=False)
+    print(t_loader.dataset.__len__(), "images loaded.")
 
-    # create a dataloader
-    # https://blog.csdn.net/m0_45287781/article/details/127947918
-    # from utils.dataloaders import create_dataloader
-    # t_loader = create_dataloader(dataset_dir, imgsz=640, batch_size=3, pad=0.5, stride=32,
-    #                                workers=8, prefix='')[0]
-
-    print(t_loader)
-
-    # evaluate
+    # test
     test(quantized_model, device, t_loader)
-
-
 
     # export config
     if quant_mode == 'calib':
         quantizer.export_quant_config()
-    if quant_mode == 'dataset':
+    if quant_mode == 'test':
         quantizer.export_xmodel(deploy_check=False, output_dir=quant_model)
 
     return
@@ -86,12 +73,12 @@ def run_main():
     # construct the argument parser and parse the arguments
     ap = argparse.ArgumentParser()
     ap.add_argument('-d', '--build_dir', type=str, default='build', help='Path to build folder. Default is build')
-    ap.add_argument('-q', '--quant_mode', type=str, default='calib', choices=['calib', 'dataset'],
-                    help='Quantization mode (calib or dataset). Default is calib')
+    ap.add_argument('-q', '--quant_mode', type=str, default='calib', choices=['calib', 'test'],
+                    help='Quantization mode (calib or test). Default is calib')
     ap.add_argument('-b', '--batchsize', type=int, default=50,
                     help='Testing batchsize - must be an integer. Default is 100')
     ap.add_argument('-s', '--source', type=str, default='dataset',
-                    help='Data set directory, when quant_mode=calib, it is for calibration, while quant_mode=dataset it is for evaluation')
+                    help='Data set directory, when quant_mode=calib, it is for calibration, while quant_mode=test it is for evaluation')
     args = ap.parse_args()
 
     print('\n' + DIVIDER)
